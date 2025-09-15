@@ -36,7 +36,7 @@ pip install -r requirements.txt
 pip install fastmcp browser-use pydantic openai python-dotenv
 ```
 
-### 🔑 Important: OpenAI API Key Setup
+### Important: OpenAI API Key Setup
 
 The intelligent features require an OpenAI API key. See [SETUP.md](SETUP.md) for detailed instructions on how to configure your API key.
 
