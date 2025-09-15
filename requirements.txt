@@ -1,6 +1,6 @@
-fastmcp
-browser-use
-pydantic
-openai
-python-dotenv
-loguru
+fastmcp==2.12.2
+browser-use==0.7.7
+pydantic==2.11.7
+openai==1.107.1
+python-dotenv==1.1.1
+loguru==0.7.3
