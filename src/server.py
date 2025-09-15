@@ -17,7 +17,7 @@ from fastmcp import FastMCP
 
 from config import logging
 from extractor import DocumentLinkExtractor
-from generic_intelligent_extractor import GenericIntelligentFinder
+from generic_intelligent_extractor import EnhancedGenericFinder
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +27,7 @@ mcp = FastMCP("document-link-extractor", version="2.0.0")
 
 # Global server instances
 extractor = DocumentLinkExtractor()
-intelligent_finder = GenericIntelligentFinder()
+intelligent_finder = EnhancedGenericFinder(include_cost=True)
 
 
 @mcp.tool()
@@ -102,6 +102,7 @@ async def find_documents_intelligent(website_url: str, search_query: str) -> str
         - Document types (PDF, Article, News, Report, etc.)
         - Descriptions and dates if available
         - Search summary of what was found
+        - Token usage statistics including cost estimates
     """
     logger.info(f"Intelligently searching for '{search_query}' at: {website_url}")
     
@@ -114,7 +115,15 @@ async def find_documents_intelligent(website_url: str, search_query: str) -> str
         error_result = {
             'success': False,
             'error': str(e),
-            'search_summary': f'Failed to find documents: {str(e)}'
+            'search_summary': f'Failed to find documents: {str(e)}',
+            'token_usage': {
+                'total_tokens': 0,
+                'prompt_tokens': 0,
+                'completion_tokens': 0,
+                'total_cost': 0.0,
+                'model': 'gpt-4o-mini',
+                'entry_count': 0
+            }
         }
         return json.dumps(error_result, indent=2)
 
@@ -139,11 +148,12 @@ async def find_pdf_documents(website_url: str, topic: str) -> str:
         - Document titles and direct URLs
         - Document types and descriptions
         - Search summary of navigation results
+        - Token usage statistics including cost estimates
     """
     logger.info(f"Searching for PDF documents about '{topic}' at: {website_url}")
     
     try:
-        result = await intelligent_finder.find_pdf_documents(website_url, topic)
+        result = await intelligent_finder.find_pdf_urls(website_url, topic)
         return json.dumps(result, indent=2)
         
     except Exception as e:
@@ -151,7 +161,15 @@ async def find_pdf_documents(website_url: str, topic: str) -> str:
         error_result = {
             'success': False,
             'error': str(e),
-            'search_summary': f'Failed to find PDF documents: {str(e)}'
+            'search_summary': f'Failed to find PDF documents: {str(e)}',
+            'token_usage': {
+                'total_tokens': 0,
+                'prompt_tokens': 0,
+                'completion_tokens': 0,
+                'total_cost': 0.0,
+                'model': 'gpt-4o-mini',
+                'entry_count': 0
+            }
         }
         return json.dumps(error_result, indent=2)
 
@@ -176,11 +194,12 @@ async def find_latest_news_pdf(website_url: str, company_name: str) -> str:
         - Article titles and direct PDF URLs
         - Publication dates and descriptions
         - Search summary of navigation results
+        - Token usage statistics including cost estimates
     """
     logger.info(f"Searching for latest PDF news about '{company_name}' at: {website_url}")
     
     try:
-        result = await intelligent_finder.find_latest_news_pdf(website_url, company_name)
+        result = await intelligent_finder.find_news_pdf_urls(website_url, company_name)
         return json.dumps(result, indent=2)
         
     except Exception as e:
@@ -188,7 +207,15 @@ async def find_latest_news_pdf(website_url: str, company_name: str) -> str:
         error_result = {
             'success': False,
             'error': str(e),
-            'search_summary': f'Failed to find news PDFs: {str(e)}'
+            'search_summary': f'Failed to find news PDFs: {str(e)}',
+            'token_usage': {
+                'total_tokens': 0,
+                'prompt_tokens': 0,
+                'completion_tokens': 0,
+                'total_cost': 0.0,
+                'model': 'gpt-4o-mini',
+                'entry_count': 0
+            }
         }
         return json.dumps(error_result, indent=2)
 
@@ -212,11 +239,12 @@ async def find_annual_reports(company_url: str) -> str:
         - Report titles and direct URLs
         - Report years and descriptions
         - Search summary of navigation results
+        - Token usage statistics including cost estimates
     """
     logger.info(f"Searching for annual reports at: {company_url}")
     
     try:
-        result = await intelligent_finder.find_annual_reports(company_url)
+        result = await intelligent_finder.find_annual_report_urls(company_url)
         return json.dumps(result, indent=2)
         
     except Exception as e:
@@ -224,7 +252,15 @@ async def find_annual_reports(company_url: str) -> str:
         error_result = {
             'success': False,
             'error': str(e),
-            'search_summary': f'Failed to find annual reports: {str(e)}'
+            'search_summary': f'Failed to find annual reports: {str(e)}',
+            'token_usage': {
+                'total_tokens': 0,
+                'prompt_tokens': 0,
+                'completion_tokens': 0,
+                'total_cost': 0.0,
+                'model': 'gpt-4o-mini',
+                'entry_count': 0
+            }
         }
         return json.dumps(error_result, indent=2)
 

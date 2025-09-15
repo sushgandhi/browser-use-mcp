@@ -3,11 +3,14 @@
 import asyncio
 import json
 import re
+import os
 from typing import Dict, Any, Optional, List
 from datetime import datetime
 
 from browser_use import Agent, BrowserSession, BrowserProfile
 from browser_use.llm.openai.chat import ChatOpenAI
+from browser_use.tokens.service import TokenCost
+from browser_use.tokens.views import UsageSummary
 from pydantic import BaseModel, Field
 
 from config import logger
@@ -33,12 +36,20 @@ class GenericSearchResult(BaseModel):
 class EnhancedGenericFinder:
     """Enhanced version that better leverages browser-use's system prompt for URL extraction."""
     
-    def __init__(self, llm_model: str = "gpt-4o-mini"):
+    def __init__(self, llm_model: str = "gpt-4o-mini", include_cost: bool = True):
         self.llm = ChatOpenAI(model=llm_model)
+        self.token_cost = TokenCost(include_cost=include_cost)
+        self.model_name = llm_model
         
     async def find_documents(self, website_url: str, search_query: str) -> Dict[str, Any]:
         """Find document URLs from a website using intelligent navigation."""
         logger.info(f"Starting intelligent URL search for '{search_query}' at: {website_url}")
+        
+        # Initialize token cost tracking
+        await self.token_cost.initialize()
+        
+        # Register the LLM for token tracking
+        tracked_llm = self.token_cost.register_llm(self.llm)
         
         # Enhanced task that leverages browser-use's system prompt capabilities
         task = f"""Navigate to {website_url} and extract URLs to documents related to: {search_query}
@@ -72,7 +83,7 @@ Return the most relevant and recent document URLs found."""
             # Create agent with enhanced system prompt for URL extraction
             agent = Agent(
                 task=task,
-                llm=self.llm,
+                llm=tracked_llm,
                 browser_session=browser_session,
                 output_model_schema=GenericSearchResult,
                 use_vision=True,
@@ -85,6 +96,9 @@ Return the most relevant and recent document URLs found."""
             # Run the agent
             history = await agent.run(max_steps=15)
             
+            # Get token usage summary
+            usage_summary = await self.token_cost.get_usage_summary()
+            
             # Extract the final result
             if history.structured_output:
                 result = history.structured_output.model_dump()
@@ -93,7 +107,15 @@ Return the most relevant and recent document URLs found."""
                     'success': True,
                     'documents': result.get('documents', []),
                     'search_summary': result.get('search_summary', 'URL extraction completed'),
-                    'agent_history': history.model_dump() if hasattr(history, 'model_dump') else str(history)
+                    'agent_history': history.model_dump() if hasattr(history, 'model_dump') else str(history),
+                    'token_usage': {
+                        'total_tokens': usage_summary.total_tokens,
+                        'prompt_tokens': usage_summary.total_prompt_tokens,
+                        'completion_tokens': usage_summary.total_completion_tokens,
+                        'total_cost': usage_summary.total_cost,
+                        'model': self.model_name,
+                        'entry_count': usage_summary.entry_count
+                    }
                 }
             else:
                 # Try to extract information from final result
@@ -104,23 +126,51 @@ Return the most relevant and recent document URLs found."""
                         'success': True,
                         'documents': self._parse_final_result(final_result),
                         'search_summary': 'URLs extracted from agent final result',
-                        'agent_history': history.model_dump() if hasattr(history, 'model_dump') else str(history)
+                        'agent_history': history.model_dump() if hasattr(history, 'model_dump') else str(history),
+                        'token_usage': {
+                            'total_tokens': usage_summary.total_tokens,
+                            'prompt_tokens': usage_summary.total_prompt_tokens,
+                            'completion_tokens': usage_summary.total_completion_tokens,
+                            'total_cost': usage_summary.total_cost,
+                            'model': self.model_name,
+                            'entry_count': usage_summary.entry_count
+                        }
                     }
                 else:
                     logger.warning("No structured output or final result available")
                     return {
                         'success': False,
                         'error': 'Agent completed but no URLs found',
-                        'search_summary': 'Agent completed without finding document URLs'
+                        'search_summary': 'Agent completed without finding document URLs',
+                        'token_usage': {
+                            'total_tokens': usage_summary.total_tokens,
+                            'prompt_tokens': usage_summary.total_prompt_tokens,
+                            'completion_tokens': usage_summary.total_completion_tokens,
+                            'total_cost': usage_summary.total_cost,
+                            'model': self.model_name,
+                            'entry_count': usage_summary.entry_count
+                        }
                     }
                     
         except Exception as e:
             logger.error(f"Error during URL extraction: {e}")
             logger.exception("Full exception details:")
+            
+            # Get token usage even on error
+            usage_summary = await self.token_cost.get_usage_summary()
+            
             return {
                 'success': False,
                 'error': str(e),
-                'search_summary': f'URL extraction failed: {str(e)}'
+                'search_summary': f'URL extraction failed: {str(e)}',
+                'token_usage': {
+                    'total_tokens': usage_summary.total_tokens,
+                    'prompt_tokens': usage_summary.total_prompt_tokens,
+                    'completion_tokens': usage_summary.total_completion_tokens,
+                    'total_cost': usage_summary.total_cost,
+                    'model': self.model_name,
+                    'entry_count': usage_summary.entry_count
+                }
             }
         finally:
             # Clean up browser session
@@ -193,6 +243,12 @@ Return the most recent annual report URLs found."""
     
     async def _execute_enhanced_task(self, task: str, website_url: str, search_description: str) -> Dict[str, Any]:
         """Execute an enhanced search task with better system prompt utilization."""
+        # Initialize token cost tracking
+        await self.token_cost.initialize()
+        
+        # Register the LLM for token tracking
+        tracked_llm = self.token_cost.register_llm(self.llm)
+        
         # Create browser profile optimized for fast URL extraction
         profile = BrowserProfile(
             headless=True,
@@ -207,7 +263,7 @@ Return the most recent annual report URLs found."""
             # Enhanced agent with better system prompt for URL extraction
             agent = Agent(
                 task=task,
-                llm=self.llm,
+                llm=tracked_llm,
                 browser_session=browser_session,
                 output_model_schema=GenericSearchResult,
                 use_vision=True,
@@ -218,6 +274,9 @@ Return the most recent annual report URLs found."""
             logger.info(f"Starting enhanced agent for {search_description} URL extraction...")
             history = await agent.run(max_steps=12)
             
+            # Get token usage summary
+            usage_summary = await self.token_cost.get_usage_summary()
+            
             if history.structured_output:
                 result = history.structured_output.model_dump()
                 return {
@@ -225,7 +284,15 @@ Return the most recent annual report URLs found."""
                     'documents': result.get('documents', []),
                     'search_summary': result.get('search_summary', f'URL extraction completed for {search_description}'),
                     'website': website_url,
-                    'search_type': search_description
+                    'search_type': search_description,
+                    'token_usage': {
+                        'total_tokens': usage_summary.total_tokens,
+                        'prompt_tokens': usage_summary.total_prompt_tokens,
+                        'completion_tokens': usage_summary.total_completion_tokens,
+                        'total_cost': usage_summary.total_cost,
+                        'model': self.model_name,
+                        'entry_count': usage_summary.entry_count
+                    }
                 }
             else:
                 final_result = history.final_result()
@@ -234,18 +301,38 @@ Return the most recent annual report URLs found."""
                     'documents': self._parse_final_result(final_result) if final_result else [],
                     'search_summary': f'URL extraction completed for {search_description}',
                     'website': website_url,
-                    'search_type': search_description
+                    'search_type': search_description,
+                    'token_usage': {
+                        'total_tokens': usage_summary.total_tokens,
+                        'prompt_tokens': usage_summary.total_prompt_tokens,
+                        'completion_tokens': usage_summary.total_completion_tokens,
+                        'total_cost': usage_summary.total_cost,
+                        'model': self.model_name,
+                        'entry_count': usage_summary.entry_count
+                    }
                 }
                     
         except Exception as e:
             logger.error(f"Error during enhanced URL extraction: {e}")
             logger.exception("Full exception details:")
+            
+            # Get token usage even on error
+            usage_summary = await self.token_cost.get_usage_summary()
+            
             return {
                 'success': False,
                 'error': str(e),
                 'search_summary': f'URL extraction failed for {search_description}: {str(e)}',
                 'website': website_url,
-                'search_type': search_description
+                'search_type': search_description,
+                'token_usage': {
+                    'total_tokens': usage_summary.total_tokens,
+                    'prompt_tokens': usage_summary.total_prompt_tokens,
+                    'completion_tokens': usage_summary.total_completion_tokens,
+                    'total_cost': usage_summary.total_cost,
+                    'model': self.model_name,
+                    'entry_count': usage_summary.entry_count
+                }
             }
         finally:
             try:
