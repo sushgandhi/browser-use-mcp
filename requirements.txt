@@ -1,0 +1,6 @@
+fastmcp
+browser-use
+pydantic
+openai
+python-dotenv
+loguru
