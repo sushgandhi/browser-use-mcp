@@ -246,6 +246,52 @@ python test_server.py
 python test_intelligent.py
 ```
 
+
+
+## MCP Sampling & Client LLM Integration
+
+### Current Architecture
+The current implementation maintains its own LLM connection (OpenAI API key) for the intelligent navigation features. This is necessary because **browser-use** requires direct LLM access to function properly.
+
+### MCP Sampling Capabilities
+The MCP protocol includes a **sampling** feature that allows servers to request LLM capabilities from the client. However, there are important limitations:
+
+#### What MCP Sampling Can Do:
+- **Text Generation**: Request the client's LLM to generate text
+- **Content Analysis**: Ask the client to analyze and extract information from text
+- **Simple Queries**: Use the client's LLM for basic text-based tasks
+- **Document Extraction**: Request LLM analysis of website content
+
+#### What MCP Sampling Cannot Do:
+- **Persistent Sessions**: Cannot maintain long-running LLM conversations
+- **Browser Automation**: Cannot directly control browser-use agents
+- **Complex Navigation**: Cannot handle multi-step web navigation tasks
+- **State Management**: Cannot maintain state across multiple LLM calls
+
+### Technical Limitations
+The **browser-use** library requires:
+1. **Direct LLM Access**: Needs to maintain persistent LLM sessions
+2. **Streaming Responses**: Requires real-time LLM interaction
+3. **Agent State**: Maintains complex state across navigation steps
+4. **Vision Capabilities**: Often uses vision models for web page analysis
+
+These requirements are not compatible with the MCP sampling protocol, which is designed for simple text generation requests.
+
+### Future Possibilities
+As the MCP ecosystem evolves, we could potentially:
+
+1. **Hybrid Approach**: Use MCP sampling for simple text tasks while keeping browser-use with direct LLM access
+2. **Client-Side Browser-Use**: Move browser automation to the client side
+3. **Enhanced Sampling**: Wait for MCP protocol extensions that support persistent sessions
+
+### Recommendation
+For now, the current architecture is optimal:
+- **Keep browser-use with direct LLM access** for complex navigation tasks
+- **Consider MCP sampling** for simple text-based document extraction in future versions
+- **Provide configuration options** to prefer client's LLM when appropriate
+
+This approach maintains the powerful browser-use capabilities while being open to future MCP enhancements.
+
 ## License
 
 MIT License - See the main browser-use repository for details.
